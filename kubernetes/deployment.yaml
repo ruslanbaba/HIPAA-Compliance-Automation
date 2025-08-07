@@ -1,0 +1,117 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hipaa-compliance-automation
+  labels:
+    app: hipaa-compliance
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: hipaa-compliance
+  template:
+    metadata:
+      labels:
+        app: hipaa-compliance
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+    spec:
+      serviceAccountName: hipaa-automation
+      containers:
+      - name: hipaa-compliance
+        image: gcr.io/${PROJECT_ID}/hipaa-compliance-automation:latest
+        ports:
+        - containerPort: 8000
+          name: metrics
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "512Mi"
+          limits:
+            cpu: "1000m"
+            memory: "1Gi"
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          readOnlyRootFilesystem: true
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        env:
+        - name: GOOGLE_CLOUD_PROJECT
+          valueFrom:
+            configMapKeyRef:
+              name: hipaa-config
+              key: project_id
+        - name: CONFIG_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: hipaa-secrets
+              key: config
+      volumes:
+      - name: config
+        configMap:
+          name: hipaa-config
+      - name: tmp
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hipaa-compliance-metrics
+  labels:
+    app: hipaa-compliance
+spec:
+  ports:
+  - port: 8000
+    name: metrics
+  selector:
+    app: hipaa-compliance
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: hipaa-compliance
+  labels:
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: hipaa-compliance
+  endpoints:
+  - port: metrics
+---
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: hipaa-compliance-psp
+spec:
+  privileged: false
+  seLinux:
+    rule: RunAsAny
+  supplementalGroups:
+    rule: RunAsAny
+  runAsUser:
+    rule: MustRunAsNonRoot
+  fsGroup:
+    rule: RunAsAny
+  volumes:
+  - configMap
+  - secret
+  - emptyDir

@@ -1,0 +1,46 @@
+# HIPAA Compliance Automation Framework Configuration
+
+gcp:
+  project_id: "your-project-id"
+  organization_id: "your-org-id"
+  region: "us-central1"
+
+hipaa_controls:
+  access_control:
+    required: true
+    validation_frequency: "daily"
+    thresholds:
+      unauthorized_attempts: 5
+      critical_findings: 0
+      high_findings: 3
+
+  audit_controls:
+    required: true
+    validation_frequency: "daily"
+    thresholds:
+      log_gaps_hours: 1
+      suspicious_access_threshold: 100
+
+  integrity:
+    required: true
+    validation_frequency: "daily"
+    thresholds:
+      unencrypted_assets: 0
+      critical_findings: 0
+
+  transmission_security:
+    required: true
+    validation_frequency: "daily"
+    thresholds:
+      insecure_networks: 0
+      unencrypted_transit: 0
+
+reporting:
+  report_format: "pdf"
+  schedule: "daily"
+  retention_days: 365
+  notification:
+    enabled: true
+    email:
+      - "compliance-team@your-domain.com"
+      - "auditors@your-domain.com"
